@@ -117,6 +117,7 @@ catkin_package(
         image_transport
         std_msgs
   DEPENDS
+        Boost
 )
 
 ###########
@@ -126,8 +127,10 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 find_package( OpenCV REQUIRED )
+find_package(Boost REQUIRED COMPONENTS thread)
 include_directories(
 include
+        ${Boost_INCLUDE_DIRS}
         ${catkin_INCLUDE_DIRS}
         ${OpenCV_INCLUDE_DIRS}
 )
@@ -137,7 +140,8 @@ file(GLOB extra_files  ./src/*.cpp ./src/*.c)
 ## Declare a C++ library
 add_library(${PROJECT_NAME}_lib
         src/fp16.c
-        src/image_util.cpp
+        src/Ncs_Segmentation.cpp
+        src/ncs_util.cpp
         ${extra_files}
 )
 
@@ -146,10 +150,17 @@ add_library(${PROJECT_NAME}_lib
 ## either from message generation or dynamic reconfigure
 # add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-## Declare a C++ executable
-## With catkin_make all packages are built within a single CMake context
-## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/seg_ncs_node.cpp)
+
+set(header ./include/)
+include_directories(${header})
+message("header files path: ${header}")
+
+
+
+# Declare a C++ executable
+# With catkin_make all packages are built within a single CMake context
+# The recommended prefix ensures that target names across packages don't collide
+add_executable(seg_ncs main.cc)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -167,20 +178,16 @@ target_link_libraries(${PROJECT_NAME}_lib
         pthread
         stdc++
         -lmvnc
+        ${Boost_LIBRARIES}
         ${OpenCV_LIBRARIES}
         ${catkin_LIBRARIES}
 )
 
 
-set(header ./include/)
-include_directories(${header})
-message("header files path: ${header}")
-
-
-add_executable(ncs_seg_main src/Ncs_Segmentation.cpp)
-target_link_libraries(ncs_seg_main  ${PROJECT_NAME}_lib
+target_link_libraries(seg_ncs  ${PROJECT_NAME}_lib
         ${catkin_LIBRARIES}
         ${OpenCV_LIBS}
+        ${Boost_LIBRARIES}
 )
 #############
 ## Install ##

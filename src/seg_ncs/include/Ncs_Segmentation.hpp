@@ -1,0 +1,67 @@
+//
+// Created by pesong on 18-9-5.
+//
+
+#ifndef SEG_NCS_ROS_NCS_SEGMENTATION_H
+#define SEG_NCS_ROS_NCS_SEGMENTATION_H
+
+#include <ros/ros.h>
+#include <image_transport/image_transport.h>
+#include <opencv2/highgui/highgui.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <mvnc.h>
+#include "ncs_util.h"
+#include "Ncs_Segmentation.hpp"
+
+
+namespace seg_ncs {
+
+
+    class Ncs_Segmentation {
+    public:
+
+        /*!
+        * Constructor.
+        */
+        explicit Ncs_Segmentation(ros::NodeHandle nh);
+
+        /*!
+         * Destructor.
+         */
+        ~Ncs_Segmentation();
+
+    private:
+
+        /*!
+         * Initialize the movidius and ROS connections.
+         */
+        void init();
+
+        void init_ncs();
+
+
+        /*!
+         * Callback of camera.
+         * @param[in] msg image pointer.
+         */
+        void imageCallback(const sensor_msgs::ImageConstPtr& msg);
+
+        cv::Mat ncs_result_process(float* output, int h, int w);
+
+
+        //! ROS node handle.
+        ros::NodeHandle nodeHandle_;
+
+        //! Advertise and subscribe to image topics.
+        image_transport::ImageTransport imageTransport_;
+
+        //! ROS subscriber and publisher.
+        image_transport::Subscriber imageSubscriber_;
+        image_transport::Publisher imageSegPub_;
+
+
+    };
+}
+#endif //SEG_NCS_ROS_NCS_SEGMENTATION_H
