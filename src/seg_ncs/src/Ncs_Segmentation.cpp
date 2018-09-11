@@ -13,7 +13,8 @@
 
 //! image dimensions, network mean values for each channel in BGR order.
 const int networkDim = 224;
-float networkMean[] = {71.60167789, 82.09696889, 72.30608881};
+//float networkMean[] = {71.60167789, 82.09696889, 72.30608881};
+float networkMean[] = {100., 100., 100.};
 const int target_h = 320;
 const int target_w = 480;
 
@@ -25,7 +26,6 @@ namespace seg_ncs {
       imageTransport_(nodeHandle_){
 
         ROS_INFO("[SSD_Detector] Node started.");
-
 
         init_ncs();
         init();
@@ -87,11 +87,9 @@ namespace seg_ncs {
 
         ROS_INFO("[Ncs_Segmentation] init().");
 
-        printf("_sub");
-        imageSubscriber_ = imageTransport_.subscribe("/tutorial/image", 1,
+        imageSubscriber_ = imageTransport_.subscribe("/camera/image", 1,
                                    &Ncs_Segmentation::imageCallback, this);
-        ROS_INFO("sub_");
-        imageSegPub_ = imageTransport_.advertise("/seg_ncs/seg_image", 1);
+        imageSegPub_ = imageTransport_.advertise("/camera/seg_out", 1);
 
     }
 
@@ -138,6 +136,7 @@ namespace seg_ncs {
         ROS_INFO("callback");
         try
         {
+            //resize，为了后面的融合展示
             cv::Mat ROS_img = cv_bridge::toCvShare(msg, "bgr8")->image;
             cv::Mat ROS_img_resized;
             cv::resize(ROS_img, ROS_img_resized, cv::Size(480,320), 0, 0, CV_INTER_LINEAR);
@@ -185,11 +184,11 @@ namespace seg_ncs {
                     cv::Mat mask = ncs_result_process(resultData32, target_h, target_w);
 
                     //图像混合
-                    double alpha = 0.8;
+                    double alpha = 0.7;
                     cv::Mat out_img;
                     cv::addWeighted(ROS_img_resized, alpha, mask, 1 - alpha, 0.0, out_img);
 
-                    cv::imshow("view", out_img);
+//                    cv::imshow("view", out_img);
 
                     // 发布topic
                     sensor_msgs::ImagePtr msg_seg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", out_img).toImageMsg();
@@ -206,55 +205,4 @@ namespace seg_ncs {
         cv::waitKey(10);
     }
 
-
-
-
 }
-
-//int main(int argc, char **argv)
-//{
-//    ros::init(argc, argv, "image_listener");
-//    ros::NodeHandle nh;
-//
-//    retCode = mvncGetDeviceName(0, devName, NAME_SIZE);
-//    if (retCode != MVNC_OK)
-//    {   // failed to get device name, maybe none plugged in.
-//        printf("No NCS devices found\n");
-//        exit(-1);
-//    }
-//
-//    // Try to open the NCS device via the device name
-//    retCode = mvncOpenDevice(devName, &deviceHandle);
-//    if (retCode != MVNC_OK)
-//    {   // failed to open the device.
-//        printf("Could not open NCS device\n");
-//        exit(-1);
-//    }
-//
-//    // deviceHandle is ready to use now.
-//    // Pass it to other NC API calls as needed and close it when finished.
-//    printf("Successfully opened NCS device!\n");
-//
-//    // Now read in a graph file
-//    unsigned int graphFileLen;
-//    void* graphFileBuf = LoadFile(GRAPH_FILE_NAME, &graphFileLen);
-//
-//    // allocate the graph
-//    retCode = mvncAllocateGraph(deviceHandle, &graphHandle, graphFileBuf, graphFileLen);
-//    if (retCode != MVNC_OK)
-//    {   // error allocating graph
-//        printf("Could not allocate graph for file: %s\n", GRAPH_FILE_NAME);
-//        printf("Error from mvncAllocateGraph is: %d\n", retCode);
-//        exit(-1);
-//    } else {
-//        printf("Successfully allocate graph for file: %s\n", GRAPH_FILE_NAME);
-//        g_graph_Success = true;
-//    }
-//
-////    cv::namedWindow("view");
-////    cv::startWindowThread();
-//    image_transport::ImageTransport it(nh);
-//    image_transport::Subscriber sub = it.subscribe("tutorial/image", 1,  imageCallback);
-//    ros::spin();
-////    cv::destroyWindow("view");
-//}

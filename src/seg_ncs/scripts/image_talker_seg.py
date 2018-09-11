@@ -12,7 +12,7 @@ IMAGE_PATH_ROOT = '/dl/model/seg/caffe/ncs_fcns/demo_test/CS/'
 
 
 def talker():
-    pub = rospy.Publisher('/tutorial/image', Image, queue_size=1)
+    pub = rospy.Publisher('/camera/image', Image, queue_size=1)
     rospy.init_node('talker', anonymous=True)
     rate = rospy.Rate(2.5)
     bridge = CvBridge()

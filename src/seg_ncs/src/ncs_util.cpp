@@ -144,7 +144,7 @@ void *LoadFile(const char *path, unsigned int *length)
     return buf;
 }
 
-
+// 加载为movidius所需要的图片格式，并resize为固定大小
 half *LoadImage(unsigned char *img, int target_w, int target_h, int ori_w, int ori_h, float *mean)
 {
     int i;

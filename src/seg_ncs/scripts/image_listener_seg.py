@@ -90,7 +90,7 @@ def listener():
     # run simultaneously.
 
     rospy.init_node('listener', anonymous=True)
-    rospy.Subscriber("/tutorial/image", Image, callback)
+    rospy.Subscriber("/camera/image", Image, callback)
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()
 
