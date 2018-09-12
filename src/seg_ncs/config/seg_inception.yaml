@@ -1,0 +1,6 @@
+seg_inception:
+  graph_file:
+    name: seg_ncs_inception_graph
+  networkDim: 224
+  target_h: 320
+  target_w: 480

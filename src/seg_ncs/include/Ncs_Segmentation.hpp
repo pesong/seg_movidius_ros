@@ -18,6 +18,15 @@
 
 namespace seg_ncs {
 
+    // graph file name
+    char *GRAPH_FILE_NAME;
+    //! image dimensions, network mean values for each channel in BGR order.
+    int networkDim;
+    int target_h;
+    int target_w;
+    //cityscapes:
+    float networkMean[] = {71.60167789, 82.09696889, 72.30608881};
+    // float networkMean[] = {100., 100., 100.};
 
     class Ncs_Segmentation {
     public:
@@ -38,7 +47,6 @@ namespace seg_ncs {
          * Initialize the movidius and ROS connections.
          */
         void init();
-
         void init_ncs();
 
 

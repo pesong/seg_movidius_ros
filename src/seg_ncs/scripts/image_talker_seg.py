@@ -14,9 +14,8 @@ IMAGE_PATH_ROOT = '/dl/model/seg/caffe/ncs_fcns/demo_test/CS/'
 def talker():
     pub = rospy.Publisher('/camera/image', Image, queue_size=1)
     rospy.init_node('talker', anonymous=True)
-    rate = rospy.Rate(2.5)
+    rate = rospy.Rate(3)
     bridge = CvBridge()
-    Video = cv2.VideoCapture(0)
     while not rospy.is_shutdown():
         for IMAGE_PATH in os.listdir(IMAGE_PATH_ROOT):
             img = skimage.io.imread(os.path.join(IMAGE_PATH_ROOT + IMAGE_PATH))

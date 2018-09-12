@@ -8,16 +8,6 @@
 #include "ncs_util.h"
 #include "Ncs_Segmentation.hpp"
 
-// graph file name
-#define GRAPH_FILE_NAME "/dl/ros/seg_ncs_ros/src/seg_ncs/bag/graph"
-
-//! image dimensions, network mean values for each channel in BGR order.
-const int networkDim = 224;
-//float networkMean[] = {71.60167789, 82.09696889, 72.30608881};
-float networkMean[] = {100., 100., 100.};
-const int target_h = 320;
-const int target_w = 480;
-
 
 namespace seg_ncs {
 
@@ -47,6 +37,19 @@ namespace seg_ncs {
 
     //  对movidius部分进行初始化
     void Ncs_Segmentation::init_ncs() {
+
+        // load param
+        std::string graphPath;
+        std::string graphModel;
+        nodeHandle_.param("seg_inception/graph_file/name", graphModel, std::string("seg_ncs_inception_graph"));
+        nodeHandle_.param("graph_path", graphPath, std::string("graph"));
+        graphPath += "/" + graphModel;
+        GRAPH_FILE_NAME = new char[graphPath.length() + 1];
+        strcpy(GRAPH_FILE_NAME, graphPath.c_str());
+        nodeHandle_.param("seg_inception/networkDim", networkDim, 224);
+        nodeHandle_.param("seg_inception/target_h", target_h, 320);
+        nodeHandle_.param("seg_inception/target_w", target_w, 480);
+
         retCode = mvncGetDeviceName(0, devName, NAME_SIZE);
         if (retCode != MVNC_OK)
         {   // failed to get device name, maybe none plugged in.
@@ -68,6 +71,7 @@ namespace seg_ncs {
 
         // Now read in a graph file
         unsigned int graphFileLen;
+
         void* graphFileBuf = LoadFile(GRAPH_FILE_NAME, &graphFileLen);
 
         // allocate the graph
@@ -86,13 +90,19 @@ namespace seg_ncs {
 
     // 对ros节点进行初始化
     void Ncs_Segmentation::init() {
-
         ROS_INFO("[Ncs_Segmentation] init().");
 
-        //todo: read parameters from yaml
-        imageSubscriber_ = imageTransport_.subscribe("/camera/image", 1,
+        // load param
+        std::string cameraTopicName;
+        std::string segTopicName;
+        nodeHandle_.param("subscribers/camera_reading/topic", cameraTopicName,
+                            std::string("/camera/image"));
+        nodeHandle_.param("subscribers/seg_image/topic", segTopicName,
+                          std::string("/seg_ros/seg_image"));
+
+        imageSubscriber_ = imageTransport_.subscribe(cameraTopicName, 1,
                                    &Ncs_Segmentation::imageCallback, this);
-        imageSegPub_ = imageTransport_.advertise("/camera/seg_out", 1);
+        imageSegPub_ = imageTransport_.advertise(segTopicName, 1);
 
     }
 
@@ -143,8 +153,6 @@ namespace seg_ncs {
             cv::Mat ROS_img = cv_bridge::toCvShare(msg, "bgr8")->image;
             cv::Mat ROS_img_resized;
             cv::resize(ROS_img, ROS_img_resized, cv::Size(480,320), 0, 0, CV_INTER_LINEAR);
-
-//            cv::imshow("ori", ROS_img_resized);
 
             // 将cvmat转为movidius使用的image类型
             unsigned char *img = cvMat_to_charImg(ROS_img);
