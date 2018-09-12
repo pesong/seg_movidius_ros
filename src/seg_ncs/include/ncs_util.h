@@ -34,23 +34,37 @@ extern  void* graphFileBuf;
 // built in support for it.
 typedef unsigned short half;
 
-typedef struct {
+class image {
+public:
     int w;
     int h;
     int c;
     float *data;
-} image;
+
+    image() {
+        data = nullptr;
+    };
+
+    image(int _w, int _h, int _c) {
+        w = _w;
+        h = _h;
+        c = _c;
+        data = new float[h * w * c]();
+    };
+
+    ~image() {
+        delete[] data;
+    };
+};
 
 
-image ipl_to_image(IplImage* src);
-void ipl_into_image(IplImage* src, image im);
-image make_image(int w, int h, int c);
-image make_empty_image(int w, int h, int c);
-void rgbgr_image(image im);
-unsigned char* image_to_stb(image in);
-unsigned char* cvMat_to_charImg(cv::Mat pic);
-void *LoadFile(const char *path, unsigned int *length);
-half *LoadImage(unsigned char *img, int target_w, int target_h, int ori_w, int ori_h, float *mean);
+extern image *ipl_to_image(IplImage *src);
+extern void ipl_into_image(IplImage *src, image *im);
+
+extern unsigned char* image_to_stb(image* in);
+extern unsigned char* cvMat_to_charImg(cv::Mat pic);
+extern void *LoadFile(const char *path, unsigned int *length);
+extern half *LoadImage(unsigned char *img, int target_w, int target_h, int ori_w, int ori_h, float *mean);
 
 
 

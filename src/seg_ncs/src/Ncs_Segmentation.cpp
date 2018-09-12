@@ -44,6 +44,8 @@ namespace seg_ncs {
         deviceHandle = NULL;
     }
 
+
+    //  对movidius部分进行初始化
     void Ncs_Segmentation::init_ncs() {
         retCode = mvncGetDeviceName(0, devName, NAME_SIZE);
         if (retCode != MVNC_OK)
@@ -82,11 +84,12 @@ namespace seg_ncs {
 
     }
 
-
+    // 对ros节点进行初始化
     void Ncs_Segmentation::init() {
 
         ROS_INFO("[Ncs_Segmentation] init().");
 
+        //todo: read parameters from yaml
         imageSubscriber_ = imageTransport_.subscribe("/camera/image", 1,
                                    &Ncs_Segmentation::imageCallback, this);
         imageSegPub_ = imageTransport_.advertise("/camera/seg_out", 1);
@@ -143,10 +146,10 @@ namespace seg_ncs {
 
 //            cv::imshow("ori", ROS_img_resized);
 
+            // 将cvmat转为movidius使用的image类型
             unsigned char *img = cvMat_to_charImg(ROS_img);
             unsigned int graphFileLen;
             half *imageBufFp16 = LoadImage(img, target_w, target_h, ROS_img.cols, ROS_img.rows, networkMean);
-
 
             // calculate the length of the buffer that contains the half precision floats.
             // 3 channels * width * height * sizeof a 16bit float
@@ -183,13 +186,13 @@ namespace seg_ncs {
                     //post process
                     cv::Mat mask = ncs_result_process(resultData32, target_h, target_w);
 
+                    free(resultData32);
+                    delete imageBufFp16;
+
                     //图像混合
                     double alpha = 0.7;
                     cv::Mat out_img;
                     cv::addWeighted(ROS_img_resized, alpha, mask, 1 - alpha, 0.0, out_img);
-
-//                    cv::imshow("view", out_img);
-
                     // 发布topic
                     sensor_msgs::ImagePtr msg_seg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", out_img).toImageMsg();
                     imageSegPub_.publish(msg_seg);
