@@ -147,12 +147,11 @@ namespace seg_ncs {
     void Ncs_Segmentation::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     {
         ROS_INFO("callback");
-        try
-        {
+        try {
             //resize，为了后面的融合展示
             cv::Mat ROS_img = cv_bridge::toCvShare(msg, "bgr8")->image;
             cv::Mat ROS_img_resized;
-            cv::resize(ROS_img, ROS_img_resized, cv::Size(480,320), 0, 0, CV_INTER_LINEAR);
+            cv::resize(ROS_img, ROS_img_resized, cv::Size(480, 320), 0, 0, CV_INTER_LINEAR);
 
             // 将cvmat转为movidius使用的image类型
             unsigned char *img = cvMat_to_charImg(ROS_img);
@@ -204,16 +203,14 @@ namespace seg_ncs {
                     // 发布topic
                     sensor_msgs::ImagePtr msg_seg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", out_img).toImageMsg();
                     imageSegPub_.publish(msg_seg);
-                    ros::spinOnce();
                 }
             }
-
         }
+
         catch (cv_bridge::Exception& e)
         {
             ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
         }
-        cv::waitKey(10);
     }
 
 }
