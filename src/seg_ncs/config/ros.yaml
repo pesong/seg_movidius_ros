@@ -1,7 +1,7 @@
 subscribers:
 
   camera_reading:
-    topic: /camera/image
+    topic: /rgb_image_hd
     queue_size: 1
 
 actions:

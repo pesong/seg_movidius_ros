@@ -6,7 +6,7 @@ import cv2
 from cv_bridge import CvBridge
 
 def talker():
-     pub = rospy.Publisher('/tutorial/image', Image, queue_size=1) 
+     pub = rospy.Publisher('/rgb_image_hd', Image, queue_size=1)
      rospy.init_node('talker', anonymous=True) 
      rate = rospy.Rate(10)
      bridge = CvBridge()

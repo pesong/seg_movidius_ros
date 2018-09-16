@@ -58,6 +58,8 @@ namespace seg_ncs {
 
         cv::Mat ncs_result_process(float* output, int h, int w);
 
+        cv::Mat camImageCopy_;
+        bool flipFlag;
 
         //! ROS node handle.
         ros::NodeHandle nodeHandle_;

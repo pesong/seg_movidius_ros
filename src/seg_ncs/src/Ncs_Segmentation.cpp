@@ -41,6 +41,7 @@ namespace seg_ncs {
         // load param
         std::string graphPath;
         std::string graphModel;
+        bool flip_flag;
         nodeHandle_.param("seg_inception/graph_file/name", graphModel, std::string("seg_ncs_inception_graph"));
         nodeHandle_.param("graph_path", graphPath, std::string("graph"));
         graphPath += "/" + graphModel;
@@ -49,6 +50,7 @@ namespace seg_ncs {
         nodeHandle_.param("seg_inception/networkDim", networkDim, 224);
         nodeHandle_.param("seg_inception/target_h", target_h, 320);
         nodeHandle_.param("seg_inception/target_w", target_w, 480);
+        nodeHandle_.param("camera/image_flip", flip_flag, false);
 
         retCode = mvncGetDeviceName(0, devName, NAME_SIZE);
         if (retCode != MVNC_OK)
@@ -144,73 +146,87 @@ namespace seg_ncs {
 
 
     // callback for inference
-    void Ncs_Segmentation::imageCallback(const sensor_msgs::ImageConstPtr& msg)
+    void Ncs_Segmentation::imageCallback(const sensor_msgs::ImageConstPtr &msg)
     {
-        ROS_INFO("callback");
+//        ROS_DEBUG("[Seg:callback] image received.");
+        cv_bridge::CvImagePtr cam_image;
+
         try {
-            //resize，为了后面的融合展示
-            cv::Mat ROS_img = cv_bridge::toCvShare(msg, "bgr8")->image;
-            cv::Mat ROS_img_resized;
-            cv::resize(ROS_img, ROS_img_resized, cv::Size(480, 320), 0, 0, CV_INTER_LINEAR);
-
-            // 将cvmat转为movidius使用的image类型
-            unsigned char *img = cvMat_to_charImg(ROS_img);
-            unsigned int graphFileLen;
-            half *imageBufFp16 = LoadImage(img, target_w, target_h, ROS_img.cols, ROS_img.rows, networkMean);
-
-            // calculate the length of the buffer that contains the half precision floats.
-            // 3 channels * width * height * sizeof a 16bit float
-            unsigned int lenBufFp16 = 3 * target_w * target_h * sizeof(*imageBufFp16);
-
-            // std::cout << "networkDim: " << networkDim << " imageBufFp16: " << sizeof(*imageBufFp16) << " lenBufFp16: " << lenBufFp16 << std::endl;
-            std::cout << " imageBufFp16: " << *imageBufFp16 << std::endl;
-            retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
-
-            if (retCode != MVNC_OK) {     // error loading tensor
-                perror("Could not load ssd tensor\n");
-                printf("Error from mvncLoadTensor is: %d\n", retCode);
-            }
-            printf("Successfully loaded the tensor for image\n");
-
-            // 判断 inference Graph的状态
-            if (g_graph_Success == true) {
-                void *resultData16;
-                void *userParam;
-                unsigned int lenResultData;
-                // 执行inference
-                retCode = mvncGetResult(graphHandle, &resultData16, &lenResultData, &userParam);
-                if (retCode ==
-                    MVNC_OK) {   // Successfully got the result.  The inference result is in the buffer pointed to by resultData
-                    printf("Successfully got the inference result for image \n");
-                    printf("resultData is %d bytes which is %d 16-bit floats.\n", lenResultData,
-                           lenResultData / (int) sizeof(half));
-
-                    int numResults = lenResultData / sizeof(half);
-                    float *resultData32;
-                    resultData32 = (float *) malloc(numResults * sizeof(*resultData32));
-                    fp16tofloat(resultData32, (unsigned char *) resultData16, numResults);
-
-                    //post process
-                    cv::Mat mask = ncs_result_process(resultData32, target_h, target_w);
-
-                    free(resultData32);
-                    delete imageBufFp16;
-
-                    //图像混合
-                    double alpha = 0.7;
-                    cv::Mat out_img;
-                    cv::addWeighted(ROS_img_resized, alpha, mask, 1 - alpha, 0.0, out_img);
-                    // 发布topic
-                    sensor_msgs::ImagePtr msg_seg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", out_img).toImageMsg();
-                    imageSegPub_.publish(msg_seg);
-                }
-            }
+            cam_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+        } catch (cv_bridge::Exception &e) {
+            ROS_ERROR("cv_bridge exception: %s", e.what());
+            return;
         }
 
-        catch (cv_bridge::Exception& e)
-        {
-            ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
+        if(cam_image){
+            //flip
+            cv::Mat image0 = cam_image->image.clone();
+            IplImage copy = image0;
+            IplImage *frame = &copy;
+            //std::cout << "flipFlag: " << flipFlag << std::endl;
+            if(flipFlag)
+                cvFlip(frame, NULL, 0); //翻转
+            camImageCopy_ = cv::cvarrToMat(frame, true);
         }
+
+        //resize，为了后面的融合展示
+//        cv::Mat ROS_img = cv_bridge::toCvShare(msg, "bgr8")->image;
+        cv::Mat ROS_img_resized;
+        cv::resize(camImageCopy_, ROS_img_resized, cv::Size(480, 320), 0, 0, CV_INTER_LINEAR);
+
+        // 将cvmat转为movidius使用的image类型
+        unsigned char *img = cvMat_to_charImg(camImageCopy_);
+        unsigned int graphFileLen;
+        half *imageBufFp16 = LoadImage(img, target_w, target_h, camImageCopy_.cols, camImageCopy_.rows, networkMean);
+
+        // calculate the length of the buffer that contains the half precision floats.
+        // 3 channels * width * height * sizeof a 16bit float
+        unsigned int lenBufFp16 = 3 * target_w * target_h * sizeof(*imageBufFp16);
+
+        // std::cout << "networkDim: " << networkDim << " imageBufFp16: " << sizeof(*imageBufFp16) << " lenBufFp16: " << lenBufFp16 << std::endl;
+        std::cout << " imageBufFp16: " << *imageBufFp16 << std::endl;
+        retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
+
+        if (retCode != MVNC_OK) {     // error loading tensor
+            perror("Could not load ssd tensor\n");
+            printf("Error from mvncLoadTensor is: %d\n", retCode);
+        }
+        printf("Successfully loaded the tensor for image\n");
+
+        // 判断 inference Graph的状态
+        if (g_graph_Success == true) {
+            void *resultData16;
+            void *userParam;
+            unsigned int lenResultData;
+            // 执行inference
+            retCode = mvncGetResult(graphHandle, &resultData16, &lenResultData, &userParam);
+            if (retCode ==
+                MVNC_OK) {   // Successfully got the result.  The inference result is in the buffer pointed to by resultData
+                printf("Successfully got the inference result for image \n");
+                printf("resultData is %d bytes which is %d 16-bit floats.\n", lenResultData,
+                       lenResultData / (int) sizeof(half));
+
+                int numResults = lenResultData / sizeof(half);
+                float *resultData32;
+                resultData32 = (float *) malloc(numResults * sizeof(*resultData32));
+                fp16tofloat(resultData32, (unsigned char *) resultData16, numResults);
+
+                //post process
+                cv::Mat mask = ncs_result_process(resultData32, target_h, target_w);
+
+                free(resultData32);
+                delete imageBufFp16;
+
+                //图像混合
+                double alpha = 0.7;
+                cv::Mat out_img;
+                cv::addWeighted(ROS_img_resized, alpha, mask, 1 - alpha, 0.0, out_img);
+                // 发布topic
+                sensor_msgs::ImagePtr msg_seg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", out_img).toImageMsg();
+                imageSegPub_.publish(msg_seg);
+            }
+        }
+        return;
     }
 
 }
