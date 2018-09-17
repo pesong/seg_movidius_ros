@@ -8,6 +8,9 @@
 #include "ncs_util.h"
 #include "Ncs_Segmentation.hpp"
 
+// Check for xServer
+#include <X11/Xlib.h>
+
 
 namespace seg_ncs {
 
@@ -23,7 +26,9 @@ namespace seg_ncs {
     }
 
     Ncs_Segmentation::~Ncs_Segmentation() {
-
+        {
+            isNodeRunning_ = false;
+        }
         //clear and close ncs
         ROS_INFO("Delete movidius SSD graph");
         retCode = mvncDeallocateGraph(graphHandle);
@@ -32,6 +37,9 @@ namespace seg_ncs {
         free(graphFileBuf);
         retCode = mvncCloseDevice(deviceHandle);
         deviceHandle = NULL;
+        free(deviceHandle);
+
+        segThread_.join();
     }
 
 
@@ -102,6 +110,10 @@ namespace seg_ncs {
         nodeHandle_.param("subscribers/seg_image/topic", segTopicName,
                           std::string("/seg_ros/seg_image"));
 
+        // seg thread
+
+        segThread_ = std::thread(&Ncs_Segmentation::seg, this);
+
         imageSubscriber_ = imageTransport_.subscribe(cameraTopicName, 1,
                                    &Ncs_Segmentation::imageCallback, this);
         imageSegPub_ = imageTransport_.advertise(segTopicName, 1);
@@ -159,25 +171,39 @@ namespace seg_ncs {
         }
 
         if(cam_image){
-            //flip
-            cv::Mat image0 = cam_image->image.clone();
-            IplImage copy = image0;
-            IplImage *frame = &copy;
-            //std::cout << "flipFlag: " << flipFlag << std::endl;
-            if(flipFlag)
-                cvFlip(frame, NULL, 0); //翻转
-            camImageCopy_ = cv::cvarrToMat(frame, true);
-        }
+            {
+                //flip
+                cv::Mat image0 = cam_image->image.clone();
+                IplImage copy = image0;
+                IplImage *frame = &copy;
+                //std::cout << "flipFlag: " << flipFlag << std::endl;
+                if(flipFlag)
+                    cvFlip(frame, NULL, 0); //翻转
+                camImageCopy_ = cv::cvarrToMat(frame, true);
+            }
 
-        //resize，为了后面的融合展示
-//        cv::Mat ROS_img = cv_bridge::toCvShare(msg, "bgr8")->image;
+            {
+                //这里对imageStatus进行赋值操作，为避免另一线程yolo()在此时读取imageStatus_，在赋值前先将其锁住
+//                std::cout << "imageStatus_" << std::endl;
+                imageStatus_ = true;
+            }
+        }
+        return;
+    }
+
+    //  movidius 推理
+    void *Ncs_Segmentation::segThread()
+    {
+
+        cv::Mat ROS_img = getCVImage();
+
         cv::Mat ROS_img_resized;
-        cv::resize(camImageCopy_, ROS_img_resized, cv::Size(480, 320), 0, 0, CV_INTER_LINEAR);
+        cv::resize(ROS_img, ROS_img_resized, cv::Size(480, 320), 0, 0, CV_INTER_LINEAR);
 
         // 将cvmat转为movidius使用的image类型
-        unsigned char *img = cvMat_to_charImg(camImageCopy_);
+        unsigned char *img = cvMat_to_charImg(ROS_img);
         unsigned int graphFileLen;
-        half *imageBufFp16 = LoadImage(img, target_w, target_h, camImageCopy_.cols, camImageCopy_.rows, networkMean);
+        half *imageBufFp16 = LoadImage(img, target_w, target_h, ROS_img.cols, ROS_img.rows, networkMean);
 
         // calculate the length of the buffer that contains the half precision floats.
         // 3 channels * width * height * sizeof a 16bit float
@@ -200,8 +226,7 @@ namespace seg_ncs {
             unsigned int lenResultData;
             // 执行inference
             retCode = mvncGetResult(graphHandle, &resultData16, &lenResultData, &userParam);
-            if (retCode ==
-                MVNC_OK) {   // Successfully got the result.  The inference result is in the buffer pointed to by resultData
+            if (retCode == MVNC_OK) {   // Successfully got the result.  The inference result is in the buffer pointed to by resultData
                 printf("Successfully got the inference result for image \n");
                 printf("resultData is %d bytes which is %d 16-bit floats.\n", lenResultData,
                        lenResultData / (int) sizeof(half));
@@ -219,14 +244,67 @@ namespace seg_ncs {
 
                 //图像混合
                 double alpha = 0.7;
-                cv::Mat out_img;
-                cv::addWeighted(ROS_img_resized, alpha, mask, 1 - alpha, 0.0, out_img);
-                // 发布topic
-                sensor_msgs::ImagePtr msg_seg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", out_img).toImageMsg();
-                imageSegPub_.publish(msg_seg);
+                cv::addWeighted(ROS_img_resized, alpha, mask, 1 - alpha, 0.0, seg_out_img);
+                return 0;
             }
         }
-        return;
+
+    }
+
+
+    void *Ncs_Segmentation::publishThread() {
+        // 发布topic
+        sensor_msgs::ImagePtr msg_seg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", seg_out_img).toImageMsg();
+        imageSegPub_.publish(msg_seg);
+
+        return 0;
+    }
+
+    void Ncs_Segmentation::seg() {
+        const auto wait_duration = std::chrono::milliseconds(2000);
+        //等待image
+        while (!getImageStatus()) {
+            printf("Waiting for image.\n");
+            if (!isNodeRunning()) {
+                return;
+            }
+            std::this_thread::sleep_for(wait_duration);
+        }
+
+        std::thread seg_thread;
+        srand(2222222);
+
+        while (!demoDone_) {
+
+            seg_thread = std::thread(&Ncs_Segmentation::segThread, this);
+
+            publishThread();
+
+            seg_thread.join();
+
+            if (!isNodeRunning()) {
+                demoDone_ = true;
+            }
+        }
+
+    }
+
+    cv::Mat Ncs_Segmentation::getCVImage() {
+        // std::cout << "getCVImage" << std::endl;
+        cv::Mat ROS_img;
+        ROS_img = camImageCopy_;
+        //camImageCopy_.copyTo(ROS_img);
+        // camImageCopy_.release();
+
+        return ROS_img;
+    }
+
+    bool Ncs_Segmentation::getImageStatus(void) {
+        return imageStatus_;
+    }
+
+    bool Ncs_Segmentation::isNodeRunning(void) {
+        return isNodeRunning_;
     }
 
 }

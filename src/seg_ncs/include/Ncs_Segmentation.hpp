@@ -11,7 +11,11 @@
 #include <cv_bridge/cv_bridge.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <thread>
 #include <mvnc.h>
+#include <boost/smart_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include "ncs_util.h"
 #include "Ncs_Segmentation.hpp"
 
@@ -59,7 +63,26 @@ namespace seg_ncs {
         cv::Mat ncs_result_process(float* output, int h, int w);
 
         cv::Mat camImageCopy_;
+        std::thread segThread_;
+
+        bool imageStatus_ = false;
+
+        bool isNodeRunning_ = true;
+
+        void *segThread();
+        void *publishThread();
+
+        void seg();
+
+        cv::Mat getCVImage();
+
+        bool getImageStatus(void);
+
+        bool isNodeRunning(void);
+
         bool flipFlag;
+        int demoDone_ = 0;
+        cv::Mat seg_out_img;
 
         //! ROS node handle.
         ros::NodeHandle nodeHandle_;
