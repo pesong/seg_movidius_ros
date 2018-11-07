@@ -16,11 +16,14 @@ extern "C" {
 
 //! movidius 设备预处理
 bool g_graph_Success;
-mvncStatus retCode;
-void *deviceHandle;
-char devName[NAME_SIZE];
-void* graphHandle;
+ncStatus_t retCode;
+struct ncDeviceHandle_t* deviceHandlePtr;
+struct ncGraphHandle_t* graphHandlePtr;
 void* graphFileBuf;
+unsigned int graphFileLen;
+// Now we need to allocate graph and create and in/out fifos
+struct ncFifoHandle_t* inFifoHandlePtr;
+struct ncFifoHandle_t* outFifoHandlePtr;
 
 
 image* ipl_to_image(IplImage* src)
@@ -93,8 +96,8 @@ unsigned char* cvMat_to_charImg(cv::Mat pic)
     return pic_final;
 }
 
-// Load a graph file
-// caller must free the buffer returned.
+// Load a graph file, caller must free the buffer returned.
+// path is the full or relative path to the graph file, length is the number of bytes read upon return
 void *LoadFile(const char *path, unsigned int *length)
 {
     FILE *fp;
@@ -120,6 +123,60 @@ void *LoadFile(const char *path, unsigned int *length)
     fclose(fp);
     return buf;
 }
+
+// 加载为movidius所需要的图片格式，并resize为固定大小
+float *LoadImage32(unsigned char *img, int target_w, int target_h, int ori_w, int ori_h, float *mean)
+{
+    int i;
+    unsigned char *imgresized;
+    float *imgfp32;
+
+    if(!img)
+    {
+        printf("The picture  could not be loaded\n");
+        return 0;
+    }
+    imgresized = (unsigned char*) malloc(3*target_w*target_h);
+    if(!imgresized)
+    {
+        free(img);
+        perror("malloc");
+        return 0;
+    }
+    stbir_resize_uint8(img, ori_w, ori_h, 0, imgresized, target_w, target_h, 0, 3);
+    free(img);
+    imgfp32 = (float*) malloc(sizeof(*imgfp32) * target_w * target_h * 3);
+    if(!imgfp32)
+    {
+        free(imgresized);
+        perror("malloc");
+        return 0;
+    }
+    for(i = 0; i < target_w * target_h * 3; i++)
+    {
+        imgfp32[i] = imgresized[i];
+    }
+    free(imgresized);
+
+    for(i = 0; i < target_w*target_h; i++)
+    {
+        // imgfp32 comes in RGB order but network expects to be in
+        // BRG order so convert to BGR here while subtracting the mean.
+        float blue, green, red;
+        blue = imgfp32[3*i+2];
+        green = imgfp32[3*i+1];
+        red = imgfp32[3*i+0];
+
+        imgfp32[3*i+0] = blue-mean[0];
+        imgfp32[3*i+1] = green-mean[1];
+        imgfp32[3*i+2] = red-mean[2];
+
+        // uncomment to see what values are getting passed to mvncLoadTensor() before conversion to half float
+        //printf("Blue: %f, Grean: %f,  Red: %f \n", imgfp32[3*i+0], imgfp32[3*i+1], imgfp32[3*i+2]);
+    }
+    return imgfp32;
+}
+
 
 // 加载为movidius所需要的图片格式，并resize为固定大小
 half *LoadImage(unsigned char *img, int target_w, int target_h, int ori_w, int ori_h, float *mean)
@@ -170,9 +227,9 @@ half *LoadImage(unsigned char *img, int target_w, int target_h, int ori_w, int o
         green = imgfp32[3*i+1];
         red = imgfp32[3*i+0];
 
-        imgfp32[3*i+0] = blue-mean[0];
-        imgfp32[3*i+1] = green-mean[1];
-        imgfp32[3*i+2] = red-mean[2];
+        imgfp32[3*i+0] = (blue-mean[0]) * 0.007843;
+        imgfp32[3*i+1] = (green-mean[1]) * 0.007843;
+        imgfp32[3*i+2] = (red-mean[2]) * 0.007843;
 
         // uncomment to see what values are getting passed to mvncLoadTensor() before conversion to half float
         //printf("Blue: %f, Grean: %f,  Red: %f \n", imgfp32[3*i+0], imgfp32[3*i+1], imgfp32[3*i+2]);

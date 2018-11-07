@@ -1,53 +1,37 @@
 /* stb_image - v2.15 - public domain image loader - http://nothings.org/stb_image.h
                                      no warranty implied; use at your own risk
-
    Do this:
       #define STB_IMAGE_IMPLEMENTATION
    before you include this file in *one* C or C++ file to create the implementation.
-
    // i.e. it should look like this:
    #include ...
    #include ...
    #include ...
    #define STB_IMAGE_IMPLEMENTATION
    #include "stb_image.h"
-
    You can #define STBI_ASSERT(x) before the #include to avoid using assert.h.
    And #define STBI_MALLOC, STBI_REALLOC, and STBI_FREE to avoid using malloc,realloc,free
-
-
    QUICK NOTES:
       Primarily of interest to game developers and other people who can
           avoid problematic images and only need the trivial interface
-
       JPEG baseline & progressive (12 bpc/arithmetic not supported, same as stock IJG lib)
       PNG 1/2/4/8/16-bit-per-channel
-
       TGA (not sure what subset, if a subset)
       BMP non-1bpp, non-RLE
       PSD (composited view only, no extra channels, 8/16 bit-per-channel)
-
       GIF (*comp always reports as 4-channel)
       HDR (radiance rgbE format)
       PIC (Softimage PIC)
       PNM (PPM and PGM binary only)
-
       Animated GIF still needs a proper API, but here's one way to do it:
           http://gist.github.com/urraka/685d9a6340b26b830d49
-
       - decode from memory or through FILE (define STBI_NO_STDIO to remove code)
       - decode from arbitrary I/O callbacks
       - SIMD acceleration on x86/x64 (SSE2) and ARM (NEON)
-
    Full documentation under "DOCUMENTATION" below.
-
-
 LICENSE
-
   See end of file for license information.
-
 RECENT REVISION HISTORY:
-
       2.15  (2017-03-18) fix png-1,2,4; all Imagenet JPGs; no runtime SSE detection on GCC
       2.14  (2017-03-03) remove deprecated STBI_JPEG_OLD; fixes for Imagenet JPGs
       2.13  (2016-12-04) experimental 16-bit API, only for PNG so far; fixes
@@ -62,12 +46,8 @@ RECENT REVISION HISTORY:
       2.07  (2015-09-13) partial animated GIF support
                          limited 16-bit PSD support
                          minor bugs, code cleanup, and compiler warnings
-
    See end of file for full revision history.
-
-
  ============================    Contributors    =========================
-
  Image formats                          Extensions, features
     Sean Barrett (jpeg, png, bmp)          Jetro Lauha (stbi_info)
     Nicolas Schulz (hdr, psd)              Martin "SpartanJ" Golini (stbi_info)
@@ -83,7 +63,6 @@ RECENT REVISION HISTORY:
  Optimizations & bugfixes
     Fabian "ryg" Giesen
     Arseny Kapoulkine
-
  Bug & warning fixes
     Marc LeBlanc            David Woo          Guillaume George   Martins Mozeiko
     Christpher Lloyd        Jerry Jansson      Joseph Thomson     Phil Jordan
@@ -98,7 +77,6 @@ RECENT REVISION HISTORY:
     Michaelangel007@github  Philipp Wiesemann  Dale Weiler        github:grim210
     Oriol Ferrer Mesia      Josh Tobin         Matthew Gregan     github:sammyhw
     Blazej Dariusz Roszkowski                  Gregory Mullen     github:phprus
-
 */
 
 #ifndef STBI_INCLUDE_STB_IMAGE_H
@@ -310,12 +288,12 @@ RECENT REVISION HISTORY:
 
 enum
 {
-   STBI_default = 0, // only used for req_comp
+    STBI_default = 0, // only used for req_comp
 
-   STBI_grey       = 1,
-   STBI_grey_alpha = 2,
-   STBI_rgb        = 3,
-   STBI_rgb_alpha  = 4
+    STBI_grey       = 1,
+    STBI_grey_alpha = 2,
+    STBI_rgb        = 3,
+    STBI_rgb_alpha  = 4
 };
 
 typedef unsigned char stbi_uc;
@@ -342,9 +320,9 @@ extern "C" {
 
 typedef struct
 {
-   int      (*read)  (void *user,char *data,int size);   // fill 'data' with 'size' bytes.  return number of bytes actually read
-   void     (*skip)  (void *user,int n);                 // skip the next 'n' bytes, or 'unget' the last -n bytes if negative
-   int      (*eof)   (void *user);                       // returns nonzero if we are at end of file/data
+    int      (*read)  (void *user,char *data,int size);   // fill 'data' with 'size' bytes.  return number of bytes actually read
+    void     (*skip)  (void *user,int n);                 // skip the next 'n' bytes, or 'unget' the last -n bytes if negative
+    int      (*eof)   (void *user);                       // returns nonzero if we are at end of file/data
 } stbi_io_callbacks;
 
 ////////////////////////////////////
@@ -377,23 +355,23 @@ STBIDEF stbi_us *stbi_load_from_file_16(FILE *f, int *x, int *y, int *channels_i
 // float-per-channel interface
 //
 #ifndef STBI_NO_LINEAR
-   STBIDEF float *stbi_loadf                 (char const *filename,           int *x, int *y, int *channels_in_file, int desired_channels);
-   STBIDEF float *stbi_loadf_from_memory     (stbi_uc const *buffer, int len, int *x, int *y, int *channels_in_file, int desired_channels);
-   STBIDEF float *stbi_loadf_from_callbacks  (stbi_io_callbacks const *clbk, void *user, int *x, int *y,  int *channels_in_file, int desired_channels);
+STBIDEF float *stbi_loadf                 (char const *filename,           int *x, int *y, int *channels_in_file, int desired_channels);
+STBIDEF float *stbi_loadf_from_memory     (stbi_uc const *buffer, int len, int *x, int *y, int *channels_in_file, int desired_channels);
+STBIDEF float *stbi_loadf_from_callbacks  (stbi_io_callbacks const *clbk, void *user, int *x, int *y,  int *channels_in_file, int desired_channels);
 
-   #ifndef STBI_NO_STDIO
-   STBIDEF float *stbi_loadf_from_file  (FILE *f, int *x, int *y, int *channels_in_file, int desired_channels);
-   #endif
+#ifndef STBI_NO_STDIO
+STBIDEF float *stbi_loadf_from_file  (FILE *f, int *x, int *y, int *channels_in_file, int desired_channels);
+#endif
 #endif
 
 #ifndef STBI_NO_HDR
-   STBIDEF void   stbi_hdr_to_ldr_gamma(float gamma);
-   STBIDEF void   stbi_hdr_to_ldr_scale(float scale);
+STBIDEF void   stbi_hdr_to_ldr_gamma(float gamma);
+STBIDEF void   stbi_hdr_to_ldr_scale(float scale);
 #endif // STBI_NO_HDR
 
 #ifndef STBI_NO_LINEAR
-   STBIDEF void   stbi_ldr_to_hdr_gamma(float gamma);
-   STBIDEF void   stbi_ldr_to_hdr_scale(float scale);
+STBIDEF void   stbi_ldr_to_hdr_gamma(float gamma);
+STBIDEF void   stbi_ldr_to_hdr_scale(float scale);
 #endif // STBI_NO_LINEAR
 
 // stbi_is_hdr is always defined, but always returns false if STBI_NO_HDR
@@ -4083,7 +4061,6 @@ Init algorithm:
    for (   ; i <= 255; ++i)     stbi__zdefault_length[i]   = 9;
    for (   ; i <= 279; ++i)     stbi__zdefault_length[i]   = 7;
    for (   ; i <= 287; ++i)     stbi__zdefault_length[i]   = 8;
-
    for (i=0; i <=  31; ++i)     stbi__zdefault_distance[i] = 5;
 }
 */

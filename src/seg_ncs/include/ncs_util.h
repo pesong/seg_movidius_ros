@@ -23,12 +23,14 @@ extern "C" {
 #include "fp16.h"
 }
 
-extern  bool g_graph_Success;
-extern  mvncStatus retCode;
-extern  void *deviceHandle;
-extern  char devName[NAME_SIZE];
-extern  void* graphHandle;
-extern  void* graphFileBuf;
+extern bool g_graph_Success;
+extern ncStatus_t retCode;
+extern struct ncDeviceHandle_t* deviceHandlePtr;
+extern struct ncGraphHandle_t* graphHandlePtr;
+extern void* graphFileBuf;
+extern unsigned int graphFileLen;
+extern struct ncFifoHandle_t* inFifoHandlePtr;
+extern struct ncFifoHandle_t* outFifoHandlePtr;
 
 // 16 bits.  will use this to store half precision floats since C++ has no
 // built in support for it.
@@ -65,7 +67,7 @@ extern unsigned char* image_to_stb(image* in);
 extern unsigned char* cvMat_to_charImg(cv::Mat pic);
 extern void *LoadFile(const char *path, unsigned int *length);
 extern half *LoadImage(unsigned char *img, int target_w, int target_h, int ori_w, int ori_h, float *mean);
-
+extern float *LoadImage32(unsigned char *img, int target_w, int target_h, int ori_w, int ori_h, float *mean);
 
 
 #endif //NCS_UTIL_H

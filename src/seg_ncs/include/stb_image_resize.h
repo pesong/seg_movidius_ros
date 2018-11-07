@@ -1,17 +1,14 @@
 /* stb_image_resize - v0.94 - public domain image resizing
    by Jorge L Rodriguez (@VinoBS) - 2014
    http://github.com/nothings/stb
-
    Written with emphasis on usability, portability, and efficiency. (No
    SIMD or threads, so it be easily outperformed by libs that use those.)
    Only scaling and translation is supported, no rotations or shears.
    Easy API downsamples w/Mitchell filter, upsamples w/cubic interpolation.
-
    COMPILING & LINKING
       In one C/C++ file that #includes this file, do this:
          #define STB_IMAGE_RESIZE_IMPLEMENTATION
       before the #include. That will create the implementation in that file.
-
    QUICKSTART
       stbir_resize_uint8(      input_pixels , in_w , in_h , 0,
                                output_pixels, out_w, out_h, 0, num_channels)
@@ -20,84 +17,62 @@
                                output_pixels, out_w, out_h, 0,
                                num_channels , alpha_chan  , 0)
       stbir_resize_uint8_srgb_edgemode(
-                               input_pixels , in_w , in_h , 0, 
-                               output_pixels, out_w, out_h, 0, 
+                               input_pixels , in_w , in_h , 0,
+                               output_pixels, out_w, out_h, 0,
                                num_channels , alpha_chan  , 0, STBIR_EDGE_CLAMP)
                                                             // WRAP/REFLECT/ZERO
-
    FULL API
       See the "header file" section of the source for API documentation.
-
    ADDITIONAL DOCUMENTATION
-
       SRGB & FLOATING POINT REPRESENTATION
          The sRGB functions presume IEEE floating point. If you do not have
          IEEE floating point, define STBIR_NON_IEEE_FLOAT. This will use
          a slower implementation.
-
       MEMORY ALLOCATION
          The resize functions here perform a single memory allocation using
          malloc. To control the memory allocation, before the #include that
          triggers the implementation, do:
-
             #define STBIR_MALLOC(size,context) ...
             #define STBIR_FREE(ptr,context)   ...
-
          Each resize function makes exactly one call to malloc/free, so to use
          temp memory, store the temp memory in the context and return that.
-
       ASSERT
          Define STBIR_ASSERT(boolval) to override assert() and not use assert.h
-
       OPTIMIZATION
          Define STBIR_SATURATE_INT to compute clamp values in-range using
          integer operations instead of float operations. This may be faster
          on some platforms.
-
       DEFAULT FILTERS
          For functions which don't provide explicit control over what filters
          to use, you can change the compile-time defaults with
-
             #define STBIR_DEFAULT_FILTER_UPSAMPLE     STBIR_FILTER_something
             #define STBIR_DEFAULT_FILTER_DOWNSAMPLE   STBIR_FILTER_something
-
          See stbir_filter in the header-file section for the list of filters.
-
       NEW FILTERS
          A number of 1D filter kernels are used. For a list of
          supported filters see the stbir_filter enum. To add a new filter,
          write a filter function and add it to stbir__filter_info_table.
-
       PROGRESS
          For interactive use with slow resize operations, you can install
          a progress-report callback:
-
             #define STBIR_PROGRESS_REPORT(val)   some_func(val)
-
          The parameter val is a float which goes from 0 to 1 as progress is made.
-
          For example:
-
             static void my_progress_report(float progress);
             #define STBIR_PROGRESS_REPORT(val) my_progress_report(val)
-
             #define STB_IMAGE_RESIZE_IMPLEMENTATION
             #include "stb_image_resize.h"
-
             static void my_progress_report(float progress)
             {
                printf("Progress: %f%%\n", progress*100);
             }
-
       MAX CHANNELS
          If your image has more than 64 channels, define STBIR_MAX_CHANNELS
          to the max you'll have.
-
       ALPHA CHANNEL
          Most of the resizing functions provide the ability to control how
          the alpha channel of an image is processed. The important things
          to know about this:
-
          1. The best mathematically-behaved version of alpha to use is
          called "premultiplied alpha", in which the other color channels
          have had the alpha value multiplied in. If you use premultiplied
@@ -105,27 +80,22 @@
          library, or performed in texture units on GPUs) does the "right
          thing". While premultiplied alpha is standard in the movie CGI
          industry, it is still uncommon in the videogame/real-time world.
-
          If you linearly filter non-premultiplied alpha, strange effects
          occur. (For example, the 50/50 average of 99% transparent bright green
          and 1% transparent black produces 50% transparent dark green when
          non-premultiplied, whereas premultiplied it produces 50%
          transparent near-black. The former introduces green energy
          that doesn't exist in the source image.)
-
          2. Artists should not edit premultiplied-alpha images; artists
          want non-premultiplied alpha images. Thus, art tools generally output
          non-premultiplied alpha images.
-
          3. You will get best results in most cases by converting images
          to premultiplied alpha before processing them mathematically.
-
          4. If you pass the flag STBIR_FLAG_ALPHA_PREMULTIPLIED, the
          resizer does not do anything special for the alpha channel;
          it is resampled identically to other channels. This produces
          the correct results for premultiplied-alpha images, but produces
          less-than-ideal results for non-premultiplied-alpha images.
-
          5. If you do not pass the flag STBIR_FLAG_ALPHA_PREMULTIPLIED,
          then the resizer weights the contribution of input pixels
          based on their alpha values, or, equivalently, it multiplies
@@ -141,32 +111,27 @@
          you can manually achieve the same result by adding a tiny epsilon
          value to the alpha channel of every image, and then subtracting
          or clamping it at the end.)
-
          6. You can suppress the behavior described in #5 and make
          all-0-alpha pixels have 0 in all channels by #defining
          STBIR_NO_ALPHA_EPSILON.
-
          7. You can separately control whether the alpha channel is
          interpreted as linear or affected by the colorspace. By default
          it is linear; you almost never want to apply the colorspace.
          (For example, graphics hardware does not apply sRGB conversion
          to the alpha channel.)
-
    CONTRIBUTORS
       Jorge L Rodriguez: Implementation
       Sean Barrett: API design, optimizations
       Aras Pranckevicius: bugfix
-         
+
    REVISIONS
       0.94 (2017-03-18) fixed warnings
       0.93 (2017-03-03) fixed bug with certain combinations of heights
       0.92 (2017-01-02) fix integer overflow on large (>2GB) images
       0.91 (2016-04-02) fix warnings; fix handling of subpixel regions
       0.90 (2014-09-17) first released version
-
    LICENSE
      See end of file for license information.
-
    TODO
       Don't decode all of the image data when only processing a partial tile
       Don't use full-width decode buffers when only processing a partial tile
@@ -221,15 +186,15 @@ typedef uint32_t stbir_uint32;
 //       and STBIR_DEFAULT_FILTER_DOWNSAMPLE, or you can use the medium-complexity API.
 
 STBIRDEF int stbir_resize_uint8(     const unsigned char *input_pixels , int input_w , int input_h , int input_stride_in_bytes,
-                                           unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                     unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
                                      int num_channels);
 
 STBIRDEF int stbir_resize_float(     const float *input_pixels , int input_w , int input_h , int input_stride_in_bytes,
-                                           float *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                     float *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
                                      int num_channels);
 
 
-// The following functions interpret image data as gamma-corrected sRGB. 
+// The following functions interpret image data as gamma-corrected sRGB.
 // Specify STBIR_ALPHA_CHANNEL_NONE if you have no alpha channel,
 // or otherwise provide the index of the alpha channel. Flags value
 // of 0 will probably do the right thing if you're not sure what
@@ -246,7 +211,7 @@ STBIRDEF int stbir_resize_float(     const float *input_pixels , int input_w , i
 #define STBIR_FLAG_ALPHA_USES_COLORSPACE  (1 << 1)
 
 STBIRDEF int stbir_resize_uint8_srgb(const unsigned char *input_pixels , int input_w , int input_h , int input_stride_in_bytes,
-                                           unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                     unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
                                      int num_channels, int alpha_channel, int flags);
 
 
@@ -260,7 +225,7 @@ typedef enum
 
 // This function adds the ability to specify how requests to sample off the edge of the image are handled.
 STBIRDEF int stbir_resize_uint8_srgb_edgemode(const unsigned char *input_pixels , int input_w , int input_h , int input_stride_in_bytes,
-                                                    unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                              unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
                                               int num_channels, int alpha_channel, int flags,
                                               stbir_edge edge_wrap_mode);
 
@@ -300,21 +265,21 @@ typedef enum
 // The following functions are all identical except for the type of the image data
 
 STBIRDEF int stbir_resize_uint8_generic( const unsigned char *input_pixels , int input_w , int input_h , int input_stride_in_bytes,
-                                               unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                         unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
                                          int num_channels, int alpha_channel, int flags,
-                                         stbir_edge edge_wrap_mode, stbir_filter filter, stbir_colorspace space, 
+                                         stbir_edge edge_wrap_mode, stbir_filter filter, stbir_colorspace space,
                                          void *alloc_context);
 
 STBIRDEF int stbir_resize_uint16_generic(const stbir_uint16 *input_pixels  , int input_w , int input_h , int input_stride_in_bytes,
-                                               stbir_uint16 *output_pixels , int output_w, int output_h, int output_stride_in_bytes,
+                                         stbir_uint16 *output_pixels , int output_w, int output_h, int output_stride_in_bytes,
                                          int num_channels, int alpha_channel, int flags,
-                                         stbir_edge edge_wrap_mode, stbir_filter filter, stbir_colorspace space, 
+                                         stbir_edge edge_wrap_mode, stbir_filter filter, stbir_colorspace space,
                                          void *alloc_context);
 
 STBIRDEF int stbir_resize_float_generic( const float *input_pixels         , int input_w , int input_h , int input_stride_in_bytes,
-                                               float *output_pixels        , int output_w, int output_h, int output_stride_in_bytes,
+                                         float *output_pixels        , int output_w, int output_h, int output_stride_in_bytes,
                                          int num_channels, int alpha_channel, int flags,
-                                         stbir_edge edge_wrap_mode, stbir_filter filter, stbir_colorspace space, 
+                                         stbir_edge edge_wrap_mode, stbir_filter filter, stbir_colorspace space,
                                          void *alloc_context);
 
 
@@ -343,28 +308,28 @@ typedef enum
 } stbir_datatype;
 
 STBIRDEF int stbir_resize(         const void *input_pixels , int input_w , int input_h , int input_stride_in_bytes,
-                                         void *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                   void *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
                                    stbir_datatype datatype,
                                    int num_channels, int alpha_channel, int flags,
-                                   stbir_edge edge_mode_horizontal, stbir_edge edge_mode_vertical, 
+                                   stbir_edge edge_mode_horizontal, stbir_edge edge_mode_vertical,
                                    stbir_filter filter_horizontal,  stbir_filter filter_vertical,
                                    stbir_colorspace space, void *alloc_context);
 
 STBIRDEF int stbir_resize_subpixel(const void *input_pixels , int input_w , int input_h , int input_stride_in_bytes,
-                                         void *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                   void *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
                                    stbir_datatype datatype,
                                    int num_channels, int alpha_channel, int flags,
-                                   stbir_edge edge_mode_horizontal, stbir_edge edge_mode_vertical, 
+                                   stbir_edge edge_mode_horizontal, stbir_edge edge_mode_vertical,
                                    stbir_filter filter_horizontal,  stbir_filter filter_vertical,
                                    stbir_colorspace space, void *alloc_context,
                                    float x_scale, float y_scale,
                                    float x_offset, float y_offset);
 
 STBIRDEF int stbir_resize_region(  const void *input_pixels , int input_w , int input_h , int input_stride_in_bytes,
-                                         void *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                   void *output_pixels, int output_w, int output_h, int output_stride_in_bytes,
                                    stbir_datatype datatype,
                                    int num_channels, int alpha_channel, int flags,
-                                   stbir_edge edge_mode_horizontal, stbir_edge edge_mode_vertical, 
+                                   stbir_edge edge_mode_horizontal, stbir_edge edge_mode_vertical,
                                    stbir_filter filter_horizontal,  stbir_filter filter_vertical,
                                    stbir_colorspace space, void *alloc_context,
                                    float s0, float t0, float s1, float t1);
@@ -665,14 +630,14 @@ static const stbir_uint32 fp32_to_srgb8_tab4[104] = {
     0x44c20798, 0x488e071e, 0x4c1c06b6, 0x4f76065d, 0x52a50610, 0x55ac05cc, 0x5892058f, 0x5b590559,
     0x5e0c0a23, 0x631c0980, 0x67db08f6, 0x6c55087f, 0x70940818, 0x74a007bd, 0x787d076c, 0x7c330723,
 };
- 
+
 static stbir_uint8 stbir__linear_to_srgb_uchar(float in)
 {
     static const stbir__FP32 almostone = { 0x3f7fffff }; // 1-eps
     static const stbir__FP32 minval = { (127-13) << 23 };
     stbir_uint32 tab,bias,scale,t;
     stbir__FP32 f;
- 
+
     // Clamp to [2^(-13), 1-eps]; these two values map to 0 and 1, respectively.
     // The tests are carefully written so that NaNs map to 0, same as in the reference
     // implementation.
@@ -680,13 +645,13 @@ static stbir_uint8 stbir__linear_to_srgb_uchar(float in)
         in = minval.f;
     if (in > almostone.f)
         in = almostone.f;
- 
+
     // Do the table lookup and unpack bias, scale
     f.f = in;
     tab = fp32_to_srgb8_tab4[(f.u - minval.u) >> 20];
     bias = (tab >> 16) << 9;
     scale = tab & 0xffff;
- 
+
     // Grab next-highest mantissa bits and perform linear interpolation
     t = (f.u >> 12) & 0xff;
     return (unsigned char) ((bias + scale*t) >> 16);
@@ -1057,7 +1022,7 @@ static void stbir__calculate_coefficients_upsample(stbir_filter filter, float sc
 
         total_filter += coefficient_group[i];
     }
-//    printf("total_filter: %f", total_filter);
+
     STBIR_ASSERT(stbir__filter_info_table[filter].kernel((float)(in_last_pixel + 1) + 0.5f - in_center_of_out, 1/scale) == 0);
 
     STBIR_ASSERT(total_filter > 0.9);
@@ -2587,38 +2552,38 @@ This software is available under 2 licenses -- choose whichever you prefer.
 ------------------------------------------------------------------------------
 ALTERNATIVE A - MIT License
 Copyright (c) 2017 Sean Barrett
-Permission is hereby granted, free of charge, to any person obtaining a copy of 
-this software and associated documentation files (the "Software"), to deal in 
-the Software without restriction, including without limitation the rights to 
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
-of the Software, and to permit persons to whom the Software is furnished to do 
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
 so, subject to the following conditions:
-The above copyright notice and this permission notice shall be included in all 
+The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ------------------------------------------------------------------------------
 ALTERNATIVE B - Public Domain (www.unlicense.org)
 This is free and unencumbered software released into the public domain.
-Anyone is free to copy, modify, publish, use, compile, sell, or distribute this 
-software, either in source code form or as a compiled binary, for any purpose, 
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
 commercial or non-commercial, and by any means.
-In jurisdictions that recognize copyright laws, the author or authors of this 
-software dedicate any and all copyright interest in the software to the public 
-domain. We make this dedication for the benefit of the public at large and to 
-the detriment of our heirs and successors. We intend this dedication to be an 
-overt act of relinquishment in perpetuity of all present and future rights to 
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
 this software under copyright law.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN 
-ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */

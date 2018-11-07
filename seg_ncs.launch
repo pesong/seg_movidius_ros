@@ -11,7 +11,7 @@
   <!-- Load parameters -->
   <rosparam command="load" ns="seg_ncs" file="$(find seg_ncs)/config/ros.yaml"/>
   <rosparam command="load" ns="seg_ncs" file="$(find seg_ncs)/config/cameraParams.yaml"/>
-  <rosparam command="load" ns="seg_ncs" file="$(find seg_ncs)/config/seg_inception.yaml"/>
+  <rosparam command="load" ns="seg_ncs" file="$(find seg_ncs)/config/seg_mobilenetv1.yaml"/>
 
   <!--node pkg="ssddetect" type="ssddetect" name="ssddetect" output="screen" launch-prefix="$(arg launch_prefix) gdb -ex run"-->
   <node pkg="seg_ncs" type="seg_ncs" name="seg_ncs" output="screen" launch-prefix="$(arg launch_prefix)">

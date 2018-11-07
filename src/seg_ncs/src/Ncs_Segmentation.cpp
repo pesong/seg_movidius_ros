@@ -31,71 +31,79 @@ namespace seg_ncs {
         }
         //clear and close ncs
         ROS_INFO("Delete movidius SSD graph");
-        retCode = mvncDeallocateGraph(graphHandle);
-        graphHandle = NULL;
 
-        free(graphFileBuf);
-        retCode = mvncCloseDevice(deviceHandle);
-        deviceHandle = NULL;
-        free(deviceHandle);
+        ncGraphDestroy(&graphHandlePtr);
+        ncDeviceClose(deviceHandlePtr);
+        ncDeviceDestroy(&deviceHandlePtr);
 
         segThread_.join();
     }
 
 
-    //  对movidius部分进行初始化
+    //  init movidius:open ncs device, creat graph and read in a graph
     void Ncs_Segmentation::init_ncs() {
 
         // load param
         std::string graphPath;
         std::string graphModel;
         bool flip_flag;
-        nodeHandle_.param("seg_inception/graph_file/name", graphModel, std::string("seg_ncs_inception_graph"));
+        nodeHandle_.param("seg_mobilenetv1/graph_file/name", graphModel, std::string("seg_ncs_v2.graph"));
         nodeHandle_.param("graph_path", graphPath, std::string("graph"));
         graphPath += "/" + graphModel;
         GRAPH_FILE_NAME = new char[graphPath.length() + 1];
         strcpy(GRAPH_FILE_NAME, graphPath.c_str());
-        nodeHandle_.param("seg_inception/networkDim", networkDim, 224);
-        nodeHandle_.param("seg_inception/target_h", target_h, 320);
-        nodeHandle_.param("seg_inception/target_w", target_w, 480);
+        nodeHandle_.param("seg_mobilenetv1/networkDim", networkDim, 300);
+        nodeHandle_.param("seg_mobilenetv1/target_h", target_h, 300);
+        nodeHandle_.param("seg_mobilenetv1/target_w", target_w, 300);
         nodeHandle_.param("camera/image_flip", flip_flag, false);
 
-        retCode = mvncGetDeviceName(0, devName, NAME_SIZE);
-        if (retCode != MVNC_OK)
-        {   // failed to get device name, maybe none plugged in.
-            printf("No NCS devices found\n");
+
+        // Try to create the first Neural Compute device (at index zero)
+        retCode = ncDeviceCreate(0, &deviceHandlePtr);
+        if (retCode != NC_OK)
+        {   // failed to create the device.
+            printf("Could not create NC device\n");
             exit(-1);
         }
 
-        // Try to open the NCS device via the device name
-        retCode = mvncOpenDevice(devName, &deviceHandle);
-        if (retCode != MVNC_OK)
+        // deviceHandle is created and ready to be opened
+        retCode = ncDeviceOpen(deviceHandlePtr);
+        if (retCode != NC_OK)
         {   // failed to open the device.
-            printf("Could not open NCS device\n");
+            printf("Could not open NC device\n");
             exit(-1);
         }
 
-        // deviceHandle is ready to use now.
-        // Pass it to other NC API calls as needed and close it when finished.
-        printf("Successfully opened NCS device!\n");
+        // The device is open and ready to be used.
+        // Pass it to other NC API calls as needed and close and destroy it when finished.
+        printf("Successfully opened NC device!\n");
 
-        // Now read in a graph file
-        unsigned int graphFileLen;
-
-        void* graphFileBuf = LoadFile(GRAPH_FILE_NAME, &graphFileLen);
-
-        // allocate the graph
-        retCode = mvncAllocateGraph(deviceHandle, &graphHandle, graphFileBuf, graphFileLen);
-        if (retCode != MVNC_OK)
+        // Create the graph
+        retCode = ncGraphCreate("GoogLeNet Graph", &graphHandlePtr);
+        if (retCode != NC_OK)
         {   // error allocating graph
-            printf("Could not allocate graph for file: %s\n", GRAPH_FILE_NAME);
-            printf("Error from mvncAllocateGraph is: %d\n", retCode);
-            exit(-1);
-        } else {
-            printf("Successfully allocate graph for file: %s\n", GRAPH_FILE_NAME);
-            g_graph_Success = true;
-        }
+            printf("Could not create graph.\n");
+            printf("Error from ncGraphCreate is: %d\n", retCode);
+        }else { // successfully created graph.  Now we need to destory it when finished with it.
+            // Now we need to allocate graph and create and in/out fifos
+            inFifoHandlePtr = NULL;
+            outFifoHandlePtr = NULL;
 
+            // Now read in a graph file from disk to memory buffer and
+            // then allocate the graph based on the file we read
+            void* graphFileBuf = LoadFile(GRAPH_FILE_NAME, &graphFileLen);
+            retCode = ncGraphAllocateWithFifos(deviceHandlePtr, graphHandlePtr, graphFileBuf, graphFileLen, &inFifoHandlePtr, &outFifoHandlePtr);
+            free(graphFileBuf);
+
+            if (retCode != NC_OK)
+            {   // error allocating graph or fifos
+                printf("Could not allocate graph with fifos.\n");
+                printf("Error from ncGraphAllocateWithFifos is: %d\n", retCode);
+            }else{
+                // Now graphHandle is ready to go we it can now process inferences.
+                printf("Successfully allocated graph for %s\n", GRAPH_FILE_NAME);
+            }
+        }
     }
 
     // 对ros节点进行初始化
@@ -111,7 +119,6 @@ namespace seg_ncs {
                           std::string("/seg_ros/seg_image"));
 
         // seg thread
-
         segThread_ = std::thread(&Ncs_Segmentation::seg, this);
 
         imageSubscriber_ = imageTransport_.subscribe(cameraTopicName, 1,
@@ -121,7 +128,7 @@ namespace seg_ncs {
     }
 
 
-    //对推理结果进行展示
+    //turn output to mask image
     cv::Mat Ncs_Segmentation::ncs_result_process(float* output, int h, int w)
     {
 
@@ -132,30 +139,29 @@ namespace seg_ncs {
         //        printf("ncs out: %f", output[i]);
         //    }
 
-        // the output of graph was bigger than original image
-        int margin = 11;
-        int h_margin = h + margin;
-        int w_margin = w + margin;
+//        // the output of graph was bigger than original image
+//        int margin = 11;
+//        int h_margin = h + margin;
+//        int w_margin = w + margin;
 
         cv::Mat mask_gray(h, w, CV_8UC1);
         cv::Mat mask;
 
         for (int i = 0; i < h; ++i) {
             for (int j = 0; j < w; ++j) {
-                if(output[2*(w_margin*i + j)] < output[2*(w_margin*i + j) + 1]){
+                if(output[2*(w*i + j)] < output[2*(h*i + j) + 1]){
                     mask_gray.at<uchar>(i,j) = 255;
                 } else{
                     mask_gray.at<uchar>(i,j) = 0;
                 }
             }
         }
-        // 灰度图转为彩色图
+        // gray -> color
         cv::cvtColor(mask_gray, mask, cv::COLOR_GRAY2BGR);
 
         return mask;
 
     }
-
 
     // callback for inference
     void Ncs_Segmentation::imageCallback(const sensor_msgs::ImageConstPtr &msg)
@@ -196,51 +202,61 @@ namespace seg_ncs {
     {
 
         cv::Mat ROS_img = getCVImage();
-
         cv::Mat ROS_img_resized;
-        cv::resize(ROS_img, ROS_img_resized, cv::Size(480, 320), 0, 0, CV_INTER_LINEAR);
+        cv::resize(ROS_img, ROS_img_resized, cv::Size(300, 300), 0, 0, CV_INTER_LINEAR);
 
-        // 将cvmat转为movidius使用的image类型
+        //// 将cvmat转为movidius使用的image类型
+
+        // Now graphHandle is ready to go we it can now process inferences.
+        // assumption here that floats are single percision 32 bit.
         unsigned char *img = cvMat_to_charImg(ROS_img);
-        unsigned int graphFileLen;
-        half *imageBufFp16 = LoadImage(img, target_w, target_h, ROS_img.cols, ROS_img.rows, networkMean);
-
-        // calculate the length of the buffer that contains the half precision floats.
-        // 3 channels * width * height * sizeof a 16bit float
-        unsigned int lenBufFp16 = 3 * target_w * target_h * sizeof(*imageBufFp16);
+        unsigned int tensorSize = 0;  /* size of image buffer should be: sizeof(float) * reqsize * reqsize * 3;*/
+        float* imageBufFP32Ptr = LoadImage32(img, target_w, target_h, ROS_img.cols, ROS_img.rows, networkMean);
+        tensorSize = sizeof(float) * networkDim * networkDim * 3;
 
         // std::cout << "networkDim: " << networkDim << " imageBufFp16: " << sizeof(*imageBufFp16) << " lenBufFp16: " << lenBufFp16 << std::endl;
 //        std::cout << " imageBufFp16: " << *imageBufFp16 << std::endl;
-        retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
 
-        if (retCode != MVNC_OK) {     // error loading tensor
-            perror("Could not load ssd tensor\n");
-            printf("Error from mvncLoadTensor is: %d\n", retCode);
+        // queue the inference to start, when its done the result will be placed on the output fifo
+        retCode = ncGraphQueueInferenceWithFifoElem(
+                graphHandlePtr, inFifoHandlePtr, outFifoHandlePtr, imageBufFP32Ptr, &tensorSize, NULL);
+
+        if (retCode != NC_OK)
+        {   // error queuing input tensor for inference
+            printf("Could not queue inference\n");
+            printf("Error from ncGraphQueueInferenceWithFifoElem is: %d\n", retCode);
         }
-        printf("Successfully loaded the tensor for image\n");
+        else
+        {
+            // the inference has been started, now read the output queue for the inference result
+            printf("Successfully queued the inference for image\n");
 
-        // 判断 inference Graph的状态
-        if (g_graph_Success == true) {
-            void *resultData16;
-            void *userParam;
-            unsigned int lenResultData;
-            // 执行inference
-            retCode = mvncGetResult(graphHandle, &resultData16, &lenResultData, &userParam);
-            if (retCode == MVNC_OK) {   // Successfully got the result.  The inference result is in the buffer pointed to by resultData
-                printf("Successfully got the inference result for image \n");
-                printf("resultData is %d bytes which is %d 16-bit floats.\n", lenResultData,
-                       lenResultData / (int) sizeof(half));
+            // get the size required for the output tensor.  This depends on the  network definition as well as the output fifo's data type.
+            // if the network outputs 1000 tensor elements and the fifo  is using FP32 (float) as the data type then we need a buffer of
+            // sizeof(float) * 1000 into which we can read the inference results.  Rather than calculate this size we can also query the fifo itself
+            // for this size with the fifo option NC_RO_FIFO_ELEMENT_DATA_SIZE.
+            unsigned int outFifoElemSize = 0;
+            unsigned int optionSize = sizeof(outFifoElemSize);
+            ncFifoGetOption(outFifoHandlePtr,  NC_RO_FIFO_ELEMENT_DATA_SIZE, &outFifoElemSize, &optionSize);
 
-                int numResults = lenResultData / sizeof(half);
-                float *resultData32;
-                resultData32 = (float *) malloc(numResults * sizeof(*resultData32));
-                fp16tofloat(resultData32, (unsigned char *) resultData16, numResults);
+            float* resultDataFP32Ptr = (float*) malloc(outFifoElemSize);
+            void* UserParamPtr = NULL;
+
+            // read the output of the inference.  this will be in FP32 since that is how the
+            // fifos are created by default.
+            retCode = ncFifoReadElem(outFifoHandlePtr, (void*)resultDataFP32Ptr, &outFifoElemSize, &UserParamPtr);
+            if (retCode == NC_OK)
+            {   // Successfully got the inference result.
+                // The inference result is in the buffer pointed to by resultDataFP32Ptr
+                printf("Successfully got the inference result for image\n");
+                int numResults = outFifoElemSize/(int)sizeof(float);
+
+                printf("resultData is %d bytes which is %d 32-bit floats.\n", outFifoElemSize, numResults);
 
                 //post process
-                cv::Mat mask = ncs_result_process(resultData32, target_h, target_w);
+                cv::Mat mask = ncs_result_process(resultDataFP32Ptr, target_h, target_w);
 
-                free(resultData32);
-                delete imageBufFp16;
+                free(resultDataFP32Ptr);
 
                 //图像混合
                 double alpha = 0.7;
@@ -251,7 +267,12 @@ namespace seg_ncs {
                 cv::addWeighted(ROS_img_resized, alpha, mask, 1 - alpha, 0.0, seg_out_img);
                 return 0;
             }
+            free((void*)resultDataFP32Ptr);
+
         }
+
+        ncFifoDestroy(&inFifoHandlePtr);
+        ncFifoDestroy(&outFifoHandlePtr);
 
     }
 
