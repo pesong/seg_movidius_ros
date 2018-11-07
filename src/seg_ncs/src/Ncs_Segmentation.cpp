@@ -210,7 +210,7 @@ namespace seg_ncs {
         unsigned int lenBufFp16 = 3 * target_w * target_h * sizeof(*imageBufFp16);
 
         // std::cout << "networkDim: " << networkDim << " imageBufFp16: " << sizeof(*imageBufFp16) << " lenBufFp16: " << lenBufFp16 << std::endl;
-        std::cout << " imageBufFp16: " << *imageBufFp16 << std::endl;
+//        std::cout << " imageBufFp16: " << *imageBufFp16 << std::endl;
         retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
 
         if (retCode != MVNC_OK) {     // error loading tensor
@@ -244,6 +244,10 @@ namespace seg_ncs {
 
                 //图像混合
                 double alpha = 0.7;
+
+//                cv::imshow("resized:",mask);
+//                cv::waitKey(0);
+
                 cv::addWeighted(ROS_img_resized, alpha, mask, 1 - alpha, 0.0, seg_out_img);
                 return 0;
             }
